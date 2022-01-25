@@ -1,0 +1,58 @@
+name: Test
+
+env:
+  PYTHON_VERSION: '3.9.9'
+
+on:
+  pull_request:
+    branches: [ main ]
+  # also run tests after merging to main
+  # nothing is blocked by these tests, but it allows caching to be shared across branches
+  push:
+    branches: [main]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{env.PYTHON_VERSION}}
+      - run: pip install black
+      - name: Validate linting
+        run: black --line-length 120 --check .
+  test:
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: 'test'
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{env.PYTHON_VERSION}}
+      - uses: snok/install-poetry@v1.1.4
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Load Cached Poetry virtualenv  # restore a previous cache, or set a cache to be created after completion
+        uses: actions/cache@v2
+        id: load-cache
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{env.PYTHON_VERSION}}-${{ hashFiles('**/poetry.lock') }}
+      - name: Install Dependencies
+        run: poetry install --no-interaction --no-root
+        if: steps.load-cache.outputs.cache-hit != 'true'
+        env:
+          POETRY_HTTP_BASIC_BLINK_USERNAME: ${{ secrets.ARTIFACTORY_USER }}
+          POETRY_HTTP_BASIC_BLINK_PASSWORD: ${{ secrets.ARTIFACTORY_ENCRYPTED_PASS }}
+      - name: Docker Compose Up - Spin up DB
+        run: |
+          docker-compose up -d
+          docker-compose ps
+      - name: Migrate
+        run: make run_migrations
+      - name: Unit Tests
+        run: make test
+      - name: Shut down dependencies
+        run: docker-compose down

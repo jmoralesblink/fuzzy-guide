@@ -1,0 +1,57 @@
+name: 'Build and Deploy Image to Environment'
+
+description: >
+  'Composite action that builds and deploys container image to specified environment;'
+  ' Code must **already** be checked out prior to running this action. Requires the'
+  ' proper EKS role and AWS login credentials'
+inputs:
+  # Required inputs
+  artifactory-user:
+    description: 'Artifactory username for package installation'
+    required: true
+  artifactory-password:
+    description: 'Artifactory password for package installation'
+    required: true
+  common-helm-input-file:
+    description: 'Common file for helm deployment, typically per-environment'
+    required: true
+  helm-input-file:
+    description: 'Config file for Helm deployment to Kubernetes'
+    required: true
+  release-name:
+    description: 'Release name for image'
+    required: true
+  image-tag:
+    description: 'Image tag'
+    required: true
+  chart-path:
+    description: 'Helm chart to be used'
+    required: true
+
+  # Optional inputs
+  aws-region:
+    description: 'AWS region attached to ECR Registry'
+    default: us-east-1
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Helm deploy
+      shell: bash
+      env:
+        EKS_NAMESPACE: django-service-bootstrap
+      run: |
+        helm repo add blink https://blink.jfrog.io/artifactory/helm-virtual \
+          --username ${{ inputs.artifactory-user }} \
+          --password ${{ inputs.artifactory-password }}
+        helm repo update
+        aws eks update-kubeconfig --name primary-work-load --region ${{ inputs.aws-region }}
+        helm upgrade \
+          -f ${{ inputs.common-helm-input-file }} \
+          -f ${{ inputs.helm-input-file }} \
+          --wait \
+          --timeout 10m \
+          --install ${{ inputs.release-name }} \
+          --set image.tag=${{ inputs.image-tag }} \
+          --namespace ${EKS_NAMESPACE} ${{ inputs.chart-path }} \

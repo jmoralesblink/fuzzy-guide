@@ -1,0 +1,29 @@
+environment:
+  ENVIRONMENT: staging
+  NEW_RELIC_CONFIG_FILE: newrelic.ini
+  NEW_RELIC_ENVIRONMENT: "staging"
+image:
+  repository: 038098751075.dkr.ecr.us-east-1.amazonaws.com/kubernetes/django-service-bootstrap
+  pullPolicy: Always
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::178541779966:role/django-service-bootstrap-staging
+    iam_role: arn:aws:iam::178541779966:role/django-service-bootstrap-staging
+  create: true
+  name: django-service-bootstrap
+vault:
+  annotations:
+    vault.hashicorp.com/agent-inject: 'true'
+    vault.hashicorp.com/role: 'django-service-bootstrap-staging'
+    vault.hashicorp.com/agent-pre-populate-only: 'true'
+    vault.hashicorp.com/agent-init-first: 'true'
+    vault.hashicorp.com/agent-inject-secret-database: 'django-service-bootstrap-staging/secret/django-service-bootstrap/database'
+    vault.hashicorp.com/agent-inject-template-database: |
+      {{- with secret "django-service-bootstrap-staging/secret/django-service-bootstrap/database" -}}
+          {{ .Data.data | toJSON }}
+      {{- end }}
+    vault.hashicorp.com/agent-inject-secret-redis: 'django-service-bootstrap-staging/secret/django-service-bootstrap/redis'
+    vault.hashicorp.com/agent-inject-template-redis: |
+      {{- with secret "django-service-bootstrap-staging/secret/django-service-bootstrap/redis" -}}
+          {{ .Data.data | toJSON }}
+      {{- end }}

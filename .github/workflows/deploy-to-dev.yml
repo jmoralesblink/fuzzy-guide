@@ -1,0 +1,65 @@
+name: Deploy to Dev
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Dev Image
+    concurrency: dev_deployment # tag github uses to determine if already running
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: 'us-east-1'
+    # runs steps after a "deploy-to-dev" label is applied
+    if: contains(github.event.pull_request.labels.*.name, 'deploy-to-dev')
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Assume EKS CICD Role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.EKS_CICD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.EKS_CICD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 900
+
+      - name: Login to Amazon ECR US East
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: '038098751075'
+
+      - name: Build and Push Docker Image
+        uses: ./.github/actions/deployment/build-image
+        with:
+          artifactory-user: ${{ secrets.ARTIFACTORY_USER }}
+          artifactory-password: ${{ secrets.ARTIFACTORY_ENCRYPTED_PASS }}
+          ecr-registry: 038098751075.dkr.ecr.us-east-1.amazonaws.com/kubernetes
+          image-name: ${{ github.sha }}
+
+      - name: Assume EKS CICD Role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.EKS_CICD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.EKS_CICD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::066560491281:role/eks/primary-work-load-EKS_CICD
+          role-duration-seconds: 900
+
+      - name: Install a specific version of helm
+        uses: azure/setup-helm@v1
+        with:
+          version: '3.5.3'
+
+      - name: Deploy Docker Image
+        uses: ./.github/actions/deployment/deploy-image
+        with:
+          artifactory-user: ${{ secrets.ARTIFACTORY_USER }}
+          artifactory-password: ${{ secrets.ARTIFACTORY_ENCRYPTED_PASS }}
+          aws-region: ${{ env.AWS_REGION }}
+          chart-path: blink/python-public-alb
+          common-helm-input-file: ./k8s/config/dev/common.yaml
+          helm-input-file: ./k8s/config/dev/api.yaml
+          image-tag: ${{ github.sha }}
+          release-name: django-service-bootstrap

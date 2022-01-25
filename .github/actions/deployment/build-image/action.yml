@@ -1,0 +1,40 @@
+name: 'Build Image and Push to Registry'
+
+description: >
+  'Composite action that builds and pushes container image to ECR Registry'
+  ' Code must **already** be checked out prior to running this action. Requires the'
+  ' proper EKS role and AWS login credentials'
+inputs:
+  ecr-registry:
+    description: 'AWS ECR Registry that will house published image'
+    default: 038098751075.dkr.ecr.us-east-1.amazonaws.com/kubernetes
+    required: false
+  artifactory-user:
+    description: 'Artifactory username for package installation'
+    required: true
+  artifactory-password:
+    description: 'Artifactory password for package installation'
+    required: true
+  eks-namespace: # Optional
+    description: 'AWS EKS namespace to house the published image'
+    default: django-service-bootstrap
+    required: false
+  image-name:
+    description: 'Name for ECR image'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build, Tag and Push Image to Amazon ECR
+      shell: bash
+      env:
+        REPOSITORY_URI: ${{ inputs.ecr-registry }}/${{ inputs.eks-namespace }}:${{ inputs.image-name }}
+        ARTIFACTORY_USER: ${{ inputs.artifactory-user }}
+        ARTIFACTORY_ENCRYPTED_PASS: ${{ inputs.artifactory-password }}
+      run: |
+        docker build \
+        --build-arg ARTIFACTORY_USER=$ARTIFACTORY_USER \
+        --build-arg ARTIFACTORY_PASSWORD=$ARTIFACTORY_ENCRYPTED_PASS \
+        -t $REPOSITORY_URI .
+        docker push $REPOSITORY_URI

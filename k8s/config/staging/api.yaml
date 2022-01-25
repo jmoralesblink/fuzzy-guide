@@ -1,0 +1,129 @@
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+# Grabbed template from: https://github.com/blinkhealth/django-k8s-service-example/
+replicaCount: 1
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: NodePort   # ClusterIP = use the ingress to expose the service rather than a dedicated load balancer (NodePort)
+  port: 8000
+  httpPort: 8000
+
+# Container environment variables
+container:
+  command: ["/bin/bash", "-c", "/app/bin/docker-entrypoint.sh"]
+  configfile: api.yaml
+  healthcheck:
+    path: /healthcheck/
+    port: 8000
+
+scale: {}
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal # internal or internet-facing
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:178541779966:certificate/32da74b4-be08-4a93-af8e-6e40507b7c52
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTP": 8000}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /healthcheck/
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+  hosts:
+    - host: django-service-bootstrap.staging.blink.codes
+      paths: ["/*"]
+  tls: []
+# configure an extra ingress.  can be configured the same way as `ingress`
+extraIngress:
+  enabled: false
+
+domain: {}
+
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+   limits:
+     cpu: 500m
+     memory: 384Mi
+   requests:
+     cpu: 100m
+     memory: 256Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+strategy:
+  type: RollingUpdate
+
+livenessProbe:
+  enabled: false
+  path: /healthcheck/
+  port: 8000
+  periodSeconds: 10
+  initialDelaySeconds: 5
+
+readinessProbe:
+  enabled: false
+  path: /healthcheck/
+  port: 8000
+  periodSeconds: 10
+  initialDelaySeconds: 5
+
+# This flag controls test in templates/test-connection.yaml
+#connectionTest:
+#  enabled: false
+
+# This flag controls test in templates/sanity-test.yaml
+#sanityTest:
+#  enabled: false
+
+# whether to intervene in the release
+# https://helm.sh/docs/topics/charts_hooks/
+hook:
+  stage: "post-install,post-upgrade"
+  enabled: true
+  timeout: 600
+  showlogs: true
+  image:
+    repository: 038098751075.dkr.ecr.us-east-1.amazonaws.com/kubernetes/django-service-bootstrap
+    pullPolicy: Always
+  name: post-hook
+  command:
+    - python
+    - manage.py
+    - migrate
+    - --no-input
+  annotations:
+    vault.hashicorp.com/agent-inject: 'true'
+    vault.hashicorp.com/role: 'django-service-bootstrap-staging'
+    vault.hashicorp.com/agent-pre-populate-only: 'true'
+    vault.hashicorp.com/agent-inject-secret-database: 'django-service-bootstrap-staging/secret/django-service-bootstrap/database'
+    vault.hashicorp.com/agent-inject-template-database: |
+      {{- with secret "django-service-bootstrap-staging/secret/django-service-bootstrap/database" -}}
+          {{ .Data.data | toJSON }}
+      {{- end }}
+    vault.hashicorp.com/agent-inject-secret-redis: 'django-service-bootstrap-staging/secret/django-service-bootstrap/redis'
+    vault.hashicorp.com/agent-inject-template-redis: |
+      {{- with secret "django-service-bootstrap-staging/secret/django-service-bootstrap/redis" -}}
+          {{ .Data.data | toJSON }}
+      {{- end }}
+  envs:
+    - name: ENVIRONMENT
+      value: staging

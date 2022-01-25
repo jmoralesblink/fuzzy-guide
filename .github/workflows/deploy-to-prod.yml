@@ -1,0 +1,46 @@
+ # Currently can only deploy things to prod that have previously been deployed to staging (this means no patches)
+  # if we want to allow for patches, we will need to create new images in this action (prefixed with 'prod-`)
+name: Deploy to Prod
+on:
+  release:
+    types:
+      - created
+jobs:
+  deploy:
+    name: Deploy Prod Image
+    concurrency: prod_deployment # tag github uses to determine if already running
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: 'us-east-1'
+      TAG_NAME: ${{ github.sha }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.TAG_NAME }}
+
+      - name: Assume EKS CICD Role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.EKS_CICD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.EKS_CICD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::429067754530:role/eks/primary-work-load-EKS_CICD
+          role-duration-seconds: 900
+
+      - name: Install a specific version of helm
+        uses: azure/setup-helm@v1
+        with:
+          version: '3.5.3'
+
+      - name: Deploy Docker Image
+        uses: ./.github/actions/deployment/deploy-image
+        with:
+          artifactory-user: ${{ secrets.ARTIFACTORY_USER }}
+          artifactory-password: ${{ secrets.ARTIFACTORY_ENCRYPTED_PASS }}
+          aws-region: ${{ env.AWS_REGION }}
+          chart-path: blink/python-public-alb
+          common-helm-input-file: ./k8s/config/prod/common.yaml
+          helm-input-file: ./k8s/config/prod/api.yaml
+          image-tag: ${{ env.TAG_NAME }}
+          release-name: django-service-bootstrap

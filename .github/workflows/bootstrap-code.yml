@@ -1,0 +1,26 @@
+name: Bootstrap base service code
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  bootstrap-code:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      # Replace the boilerplate with service-specific names across the codebase
+      - name: Run Bootstrap Action
+        run: python scripts/create_new_service.py ${{github.event.repository.name}}
+      # Commit changes and open a PR into main
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GH_API_TOKEN }}
+          branch: init
+          commit-message: "Initial bootstrap from template"
+          title: "Initial bootstrap from template"
+          body: "Service code generated from [django-service-bootstrap](https://github.com/blinkhealth/django-service-bootstrap) template. PR created by by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action"

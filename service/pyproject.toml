@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "django-service-bootstrap"
+version = "0.1.0"
+description = "Enter a description of your service."
+authors = ["Your Name <you@example.com>"]
+
+[[tool.poetry.source]]
+name = "blink"
+url = "https://blink.jfrog.io/blink/api/pypi/pypi/simple"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+Django = "^3.1.7"
+gunicorn = "^20.0.4"  # WSGI web server that hosts this Django app
+deepmerge = "^0.3.0"  # used to merge dictionaries in settings
+djangorestframework = "^3.12.3"
+django-extensions = "^3.1.0"  # used for extra abilities such as reset_db command
+psycopg2-binary = "^2.8.6"  # adapter for postgres
+redis = "^3.4"
+django_redis="^5.0.0"
+drf-yasg="^1.17.1"  # used for generating swagger documentation
+python-json-logger = "^2.0.1"  # format all logs as json
+blink-messaging = "^0.3.1"  # sending and receiving async messages, such as through SQS, Kinesis, etc.
+newrelic = "^6.2.0"  # application performance monitoring agent
+datadog = "^0.41.0"  # client for Datadog, but only used for its statsd client
+httpx = "^0.18.1"  # http client that supports async requests, and calling directly into a wsgi/asgi application
+django-safedelete = "^1.0.0" # manages deleting objects from your database, provides safeguards
+transitions = "^0.8.8"
+django-filter = "^2.4.0"
+rich = "^10.1.0"
+blink-logging-metrics = "^0.3.2"
+factory-boy = "^3.2.0"
+respx = "^0.17.0"
+pytest-asyncio = "^0.15.1"
+django-redis = "^5.0.0"
+whitenoise = "^5.2.0"
+pytest-env = "^0.6.2"
+
+[tool.poetry.dev-dependencies]
+black = "^21.4b2"  # linting
+pytest-django = "^4.1.0"  # unit test framework, with django-specific wrappers around pytest to make it easier to use
+pytest-mock = "^3.5.1"  # thin wrapper around mock that automatically undoes mocks after a test
+pytest-xdist = "^2.2.1"  # allows using -n when calling pytest to specify the number of parallel executors
+pytest-env = "^0.6.2"  # allows setting environment variables in pytest.ini
+mock = "^4.0.3"  # allows replacing objects with mocks for testing
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
